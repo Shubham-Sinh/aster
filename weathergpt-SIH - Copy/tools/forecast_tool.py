@@ -23,6 +23,9 @@ def forcast_weather(days: int, latitude: float, longitude: float):
         "precipitation_sum"
     )
 }
+    print("FORECAST REQUEST:", response_url if False else url) 
+    print("FORECAST PARAMS:", params)
+    
     response = requests.get(
         url,
         params=params,
