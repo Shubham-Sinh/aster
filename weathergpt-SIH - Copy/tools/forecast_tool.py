@@ -11,34 +11,18 @@ def forcast_weather(days: int, latitude: float, longitude: float):
     forecast_days = min(max(int(days), 1), 7)
 
     params = {
-        "latitude": float(latitude),
-        "longitude": float(longitude),
-        "forecast_days": forecast_days,
-        "timezone": "auto",
+    "latitude": float(latitude),
+    "longitude": float(longitude),
+    "forecast_days": forecast_days,
+    "timezone": "auto",
 
-        "current": (
-            "temperature_2m,"
-            "relative_humidity_2m,"
-            "wind_speed_10m"
-        ),
-
-        "hourly": (
-            "rain,"
-            "temperature_2m,"
-            "relative_humidity_2m,"
-            "pressure_msl,"
-            "wind_speed_10m,"
-            "cloud_cover"
-        ),
-
-        "daily": (
-            "temperature_2m_max,"
-            "temperature_2m_min,"
-            "precipitation_probability_max,"
-            "precipitation_sum"
-        )
-    }
-
+    "daily": (
+        "temperature_2m_max,"
+        "temperature_2m_min,"
+        "precipitation_probability_max,"
+        "precipitation_sum"
+    )
+}
     response = requests.get(
         url,
         params=params,
