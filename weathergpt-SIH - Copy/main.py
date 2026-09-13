@@ -80,27 +80,33 @@ def get_weather(city: str):
 
 @app.get("/forecast/{city}")
 def get_forecast(city: str, days: int = 7):
-    # First find city's coordinates
-    location = weather_tool.invoke(city)
+    try:
+        # First find city's coordinates
+        location = weather_tool.invoke(city)
 
-    # If location search failed
-    if isinstance(location, str):
-        return {"error": location}
+        if isinstance(location, str):
+            return {"error": location}
 
-    # Get forecast using existing forecast tool
-    result = forcast_weather.invoke({
-        "days": days,
-        "latitude": location["latitude"],
-        "longitude": location["longitude"]
-    })
+        # Get forecast
+        result = forcast_weather.invoke({
+            "days": days,
+            "latitude": location["latitude"],
+            "longitude": location["longitude"]
+        })
 
-    return {
-        "city": location["city"],
-        "latitude": location["latitude"],
-        "longitude": location["longitude"],
-        "forecast": result
-    }
+        return {
+            "city": location["city"],
+            "latitude": location["latitude"],
+            "longitude": location["longitude"],
+            "forecast": result
+        }
 
+    except Exception as e:
+        print("FORECAST ERROR:", repr(e))
+        return {
+            "error": "Forecast failed",
+            "details": str(e)
+        }
 @app.get("/historical-weather/{city}")
 def get_historical_weather(city: str, days: int = 7):
 
