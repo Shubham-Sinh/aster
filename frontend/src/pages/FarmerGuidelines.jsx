@@ -21,7 +21,7 @@ function FarmerGuidelines() {
 
     try {
       const response = await fetch(
-        `http://127.0.0.1:8000/weather-ai?question=${encodeURIComponent(q)}`
+        `https://aster-4.onrender.com/weather-ai?question=${encodeURIComponent(q)}`
       );
 
       if (!response.ok) {
