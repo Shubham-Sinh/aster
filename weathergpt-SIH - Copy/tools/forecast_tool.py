@@ -1,4 +1,3 @@
-import time
 import requests
 from langchain_core.tools import tool
 
@@ -9,41 +8,54 @@ def forcast_weather(days: int, latitude: float, longitude: float):
 
     url = "https://api.open-meteo.com/v1/forecast"
 
-    forecast_days = max(int(days), 1)
+    forecast_days = min(max(int(days), 1), 7)
 
-    param = {
-        "forecast_days": forecast_days,
+    params = {
         "latitude": float(latitude),
         "longitude": float(longitude),
+        "forecast_days": forecast_days,
         "timezone": "auto",
-        "hourly": "rain,temperature_2m,relative_humidity_2m,pressure_msl,wind_speed_10m,cloud_cover",
-        "daily": "temperature_2m_max,temperature_2m_min,precipitation_probability_max"
+
+        "current": (
+            "temperature_2m,"
+            "relative_humidity_2m,"
+            "wind_speed_10m"
+        ),
+
+        "hourly": (
+            "rain,"
+            "temperature_2m,"
+            "relative_humidity_2m,"
+            "pressure_msl,"
+            "wind_speed_10m,"
+            "cloud_cover"
+        ),
+
+        "daily": (
+            "temperature_2m_max,"
+            "temperature_2m_min,"
+            "precipitation_probability_max,"
+            "precipitation_sum"
+        )
     }
 
-    # Try up to 3 times if Open-Meteo temporarily returns 429
-    for attempt in range(3):
+    response = requests.get(
+        url,
+        params=params,
+        timeout=20
+    )
 
-        response = requests.get(
-            url,
-            params=param,
-            timeout=15
+    if response.status_code == 429:
+        raise ValueError(
+            "Open-Meteo rate limit reached. Please try again later."
         )
 
-        if response.status_code == 429:
+    response.raise_for_status()
 
-            if attempt < 2:
-                time.sleep(3)
-                continue
+    data = response.json()
 
-            raise ValueError(
-                "Open-Meteo rate limit reached. Please try again later."
-            )
-
-        response.raise_for_status()
-
-        res = response.json()
-
-        return {
-            "hourly": res.get("hourly", {}),
-            "daily": res.get("daily", {})
-        }
+    return {
+        "current": data.get("current", {}),
+        "hourly": data.get("hourly", {}),
+        "daily": data.get("daily", {})
+    }
