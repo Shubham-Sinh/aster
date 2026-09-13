@@ -1,0 +1,672 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Weather Map</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,400;0,500;0,600;1,400&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --sky:#F5F8FC;
+    --ink:#14213D;
+    --ink-soft:#5B6B8C;
+    --sun:#FF6B35;
+    --data:#3A86FF;
+    --line:#E2E8F3;
+    --card:#FFFFFF;
+    --rain:#2A9D6F;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;font-family:'Inter',sans-serif;background:var(--sky);color:var(--ink);}
+  .app{max-width:1180px;margin:0 auto;padding:28px 20px 60px;}
+  header{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:22px;flex-wrap:wrap;gap:8px;}
+  header h1{font-family:'Fraunces',serif;font-weight:500;font-size:28px;margin:0;letter-spacing:-0.01em;}
+  header .tag{color:var(--ink-soft);font-size:14px;}
+  #backendPill{
+    font-size:11px;padding:4px 10px;border-radius:20px;border:1px solid var(--line);
+    color:var(--ink-soft);background:var(--card);
+  }
+  .controls{display:flex;gap:10px;margin-bottom:16px;}
+  .search-wrap{position:relative;flex:1;}
+  .controls input{
+    width:100%;padding:13px 16px;border:1px solid var(--line);border-radius:10px;
+    font-size:15px;font-family:inherit;background:var(--card);color:var(--ink);
+  }
+  .controls input:focus{outline:none;border-color:var(--data);}
+  .suggestions{
+    position:absolute;top:calc(100% + 6px);left:0;right:0;background:var(--card);
+    border:1px solid var(--line);border-radius:10px;overflow:hidden;z-index:1000;
+    box-shadow:0 12px 30px rgba(20,33,61,0.12);display:none;
+  }
+  .suggestions.open{display:block;}
+  .suggestions div{padding:11px 16px;font-size:14px;cursor:pointer;border-bottom:1px solid var(--line);}
+  .suggestions div:last-child{border-bottom:none;}
+  .suggestions div:hover{background:var(--sky);}
+  .suggestions div small{display:block;color:var(--ink-soft);font-size:12px;margin-top:2px;}
+  .icon-btn{
+    border:1px solid var(--line);background:var(--card);border-radius:10px;width:48px;height:48px;
+    flex:0 0 48px;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:19px;color:var(--ink);
+  }
+  .icon-btn:hover{border-color:var(--data);}
+  .go-btn{
+    border:0;border-radius:10px;padding:0 22px;background:var(--ink);color:white;
+    cursor:pointer;font-size:15px;font-weight:600;font-family:inherit;
+  }
+  .go-btn:hover{background:#233158;}
+  #map{width:100%;height:440px;border-radius:14px;overflow:hidden;border:1px solid var(--line);}
+  .panel{margin-top:18px;background:var(--card);border-radius:14px;border:1px solid var(--line);padding:26px 28px;}
+  .panel-top{display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:18px;padding-bottom:22px;}
+  .location-block h2{margin:0 0 4px;font-family:'Fraunces',serif;font-weight:500;font-size:20px;}
+  #status{color:var(--ink-soft);font-size:13px;margin:0;}
+  .hero-temp{display:flex;align-items:center;gap:16px;}
+  .hero-temp .emoji{font-size:46px;line-height:1;}
+  .hero-temp .num{font-family:'Fraunces',serif;font-size:56px;font-weight:500;line-height:1;letter-spacing:-0.02em;}
+  .hero-temp .meta{font-size:13px;color:var(--ink-soft);line-height:1.5;}
+  .isobar{height:1px;background:repeating-linear-gradient(90deg, var(--line) 0 8px, transparent 8px 14px);margin:0 0 22px;}
+  .stat-row{display:grid;grid-template-columns:repeat(6,1fr);gap:0;}
+  .stat{padding:0 14px;border-left:1px solid var(--line);}
+  .stat:first-child{border-left:none;padding-left:0;}
+  .stat span{display:block;color:var(--ink-soft);font-size:12px;margin-bottom:6px;}
+  .stat strong{font-size:17px;font-weight:600;}
+
+  .aqi-badge{
+    display:inline-flex;align-items:center;gap:8px;padding:6px 12px;border-radius:20px;
+    font-size:13px;font-weight:600;color:white;margin-top:4px;
+  }
+  .aqi-dot{width:8px;height:8px;border-radius:50%;background:white;opacity:0.85;}
+
+  .flood-banner{
+    margin-top:22px;padding:14px 16px;border-radius:10px;border:1px solid var(--line);
+    display:flex;align-items:center;gap:12px;font-size:13px;
+  }
+  .flood-dot{width:10px;height:10px;border-radius:50%;flex:0 0 10px;}
+  .flood-banner strong{font-size:14px;}
+  .flood-banner .note{color:var(--ink-soft);font-size:12px;margin-left:auto;}
+
+  .map-legend{
+    display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin:10px 0 16px;font-size:12px;color:var(--ink-soft);
+  }
+  .map-legend .dot{width:9px;height:9px;border-radius:50%;display:inline-block;margin-right:5px;vertical-align:middle;}
+  .map-legend label{display:flex;align-items:center;gap:6px;cursor:pointer;}
+
+  .section-label{font-size:13px;font-weight:600;color:var(--ink-soft);margin:24px 0 10px;}
+
+  .hourly-strip{display:flex;gap:8px;overflow-x:auto;padding-bottom:6px;}
+  .hitem{
+    flex:0 0 62px;text-align:center;padding:12px 4px;border-radius:10px;background:var(--sky);
+  }
+  .hitem .t{font-size:11px;color:var(--ink-soft);margin-bottom:6px;}
+  .hitem .e{font-size:20px;margin-bottom:6px;}
+  .hitem .v{font-size:13px;font-weight:700;}
+
+  .forecast{margin-top:10px;display:grid;grid-template-columns:repeat(5,1fr);gap:10px;}
+  .fday{text-align:center;padding:14px 6px;border-radius:10px;background:var(--sky);}
+  .fday .d{font-size:12px;color:var(--ink-soft);margin-bottom:6px;font-weight:600;}
+  .fday .e{font-size:24px;margin-bottom:6px;}
+  .fday .hi{font-weight:700;font-size:14px;}
+  .fday .lo{font-size:13px;color:var(--ink-soft);margin-left:4px;}
+  .fday .p{font-size:11px;color:var(--data);margin-top:4px;}
+
+  @media (max-width:800px){
+    .stat-row{grid-template-columns:repeat(3,1fr);row-gap:16px;}
+    .hero-temp .num{font-size:44px;}
+  }
+  @media (max-width:600px){
+    #map{height:340px;}
+    .forecast{gap:6px;}
+    .fday{padding:10px 3px;}
+    .fday .hi{font-size:12px;}
+    .fday .lo{font-size:11px;}
+    .panel{padding:20px 18px;}
+    .stat-row{grid-template-columns:repeat(2,1fr);}
+    .flood-banner{flex-wrap:wrap;}
+    .flood-banner .note{margin-left:0;}
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <h1>Weather Map</h1>
+    <span id="backendPill">Checking backend…</span>
+  </header>
+
+  <div class="controls">
+    <div class="search-wrap">
+      <input id="cityInput" type="text" placeholder="Search for a city or place..." autocomplete="off">
+      <div class="suggestions" id="suggestions"></div>
+    </div>
+    <button class="icon-btn" id="locateBtn" title="Use my location">📍</button>
+    <button class="go-btn" onclick="searchCity()">Search</button>
+  </div>
+
+  <div id="map"></div>
+  <div class="map-legend" id="mapLegend">
+    <label><input type="checkbox" id="toggleDisasters" checked> Disaster reports (GDACS)</label>
+    <label><input type="checkbox" id="toggleQuakes" checked> Earthquakes M4.5+ (USGS)</label>
+    <span id="alertsStatus" style="margin-left:auto;"></span>
+  </div>
+  <div class="map-legend" style="margin-top:-10px;">
+    <span><span class="dot" style="background:#2A9D6F"></span>Green alert</span>
+    <span><span class="dot" style="background:#F4A261"></span>Orange alert</span>
+    <span><span class="dot" style="background:#E76F51"></span>Red alert</span>
+    <span>🌊 Flood · 🌀 Cyclone · 🔥 Wildfire · 🌋 Volcano · 🏜️ Drought · ⬤ Earthquake</span>
+  </div>
+
+  <div class="panel">
+    <div class="panel-top">
+      <div class="location-block">
+        <h2 id="locationName">Select a location</h2>
+        <p id="status">Click anywhere on the map, search a city, or use your location.</p>
+        <div id="aqiBadge"></div>
+      </div>
+      <div class="hero-temp" id="heroTemp" style="display:none;">
+        <div class="emoji" id="heroEmoji">—</div>
+        <div><div class="num"><span id="temperature">--</span>°</div></div>
+        <div class="meta">
+          Feels like <strong id="feelsLike">--</strong>°<br>
+          <span id="dayNight">--</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="isobar"></div>
+
+    <div class="stat-row">
+      <div class="stat"><span>Humidity</span><strong id="humidity">--</strong></div>
+      <div class="stat"><span>Wind</span><strong id="wind">--</strong></div>
+      <div class="stat"><span>Pressure</span><strong id="pressure">--</strong></div>
+      <div class="stat"><span>Visibility</span><strong id="visibility">--</strong></div>
+      <div class="stat"><span>Rain</span><strong id="rain">--</strong></div>
+      <div class="stat"><span>Updated</span><strong id="updated">--</strong></div>
+    </div>
+
+    <div id="floodBanner"></div>
+
+    <div class="section-label">Next 24 hours</div>
+    <div class="hourly-strip" id="hourlyStrip"></div>
+
+    <div class="section-label">5-day forecast</div>
+    <div class="forecast" id="forecast"></div>
+  </div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+  // Point this at your running FastAPI backend (see main.py).
+  // If it's unreachable, the app falls back to calling the weather APIs directly from the browser.
+  const API_BASE = "http://localhost:8000";
+  let backendUp = false;
+
+  const map = L.map("map").setView([20.5937, 78.9629], 5);
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    attribution: "&copy; OpenStreetMap contributors",
+    maxZoom: 18
+  }).addTo(map);
+
+  let marker = null;
+  let floodCircle = null;
+
+  const WMO = {
+    0:["☀️","Clear sky"],1:["🌤️","Mainly clear"],2:["⛅","Partly cloudy"],3:["☁️","Overcast"],
+    45:["🌫️","Fog"],48:["🌫️","Rime fog"],
+    51:["🌦️","Light drizzle"],53:["🌦️","Drizzle"],55:["🌦️","Dense drizzle"],
+    56:["🌧️","Freezing drizzle"],57:["🌧️","Freezing drizzle"],
+    61:["🌧️","Slight rain"],63:["🌧️","Rain"],65:["🌧️","Heavy rain"],
+    66:["🌧️","Freezing rain"],67:["🌧️","Freezing rain"],
+    71:["🌨️","Slight snow"],73:["🌨️","Snow"],75:["❄️","Heavy snow"],77:["❄️","Snow grains"],
+    80:["🌦️","Rain showers"],81:["🌦️","Rain showers"],82:["⛈️","Violent showers"],
+    85:["🌨️","Snow showers"],86:["🌨️","Snow showers"],
+    95:["⛈️","Thunderstorm"],96:["⛈️","Storm w/ hail"],99:["⛈️","Storm w/ hail"]
+  };
+  const wmo = c => WMO[c] || ["🌡️","Unknown"];
+  const fmtVis = m => (m == null) ? "--" : (m/1000).toFixed(1) + " km";
+
+  function aqiCategory(aqi){
+    if (aqi == null) return null;
+    if (aqi<=50) return {label:"Good",color:"#2A9D6F"};
+    if (aqi<=100) return {label:"Moderate",color:"#E9C46A"};
+    if (aqi<=150) return {label:"Unhealthy (sensitive)",color:"#F4A261"};
+    if (aqi<=200) return {label:"Unhealthy",color:"#E76F51"};
+    if (aqi<=300) return {label:"Very unhealthy",color:"#9C2C77"};
+    return {label:"Hazardous",color:"#6A0136"};
+  }
+
+  function floodRisk(discharge, mean){
+    if (discharge == null || mean == null || mean === 0) return {level:"unknown", color:"#94A3B8", ratio:null};
+    const ratio = discharge / mean;
+    if (ratio < 1.3) return {level:"low", color:"#2A9D6F", ratio};
+    if (ratio < 2) return {level:"moderate", color:"#F4A261", ratio};
+    return {level:"high", color:"#E76F51", ratio};
+  }
+
+  // --- Check backend availability once on load ---
+  async function checkBackend(){
+    try {
+      const res = await fetch(`${API_BASE}/health`, { signal: AbortSignal.timeout(1200) });
+      backendUp = res.ok;
+    } catch { backendUp = false; }
+    const pill = document.getElementById("backendPill");
+    pill.textContent = backendUp ? "FastAPI backend connected" : "Standalone mode (no backend)";
+    pill.style.color = backendUp ? "#2A9D6F" : "#94A3B8";
+  }
+
+  // --- Fallback: assemble the same payload shape directly from the browser ---
+  async function fetchLocationDataDirect(lat, lon, presetName){
+    const [weatherRes, airRes, floodRes, reverseRes] = await Promise.allSettled([
+      fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}` +
+        `&current=temperature_2m,relative_humidity_2m,apparent_temperature,wind_speed_10m,rain,weather_code,pressure_msl,is_day` +
+        `&hourly=temperature_2m,weather_code,precipitation_probability,visibility` +
+        `&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max` +
+        `&timezone=auto&forecast_days=5`).then(r => r.json()),
+      fetch(`https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${lat}&longitude=${lon}` +
+        `&current=us_aqi,pm2_5,pm10,ozone,nitrogen_dioxide&timezone=auto`).then(r => r.json()),
+      fetch(`https://flood-api.open-meteo.com/v1/flood?latitude=${lat}&longitude=${lon}` +
+        `&daily=river_discharge,river_discharge_mean&forecast_days=1&timezone=auto`).then(r => r.json()).catch(() => null),
+      presetName ? Promise.resolve(null) : fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lon}&localityLanguage=en`).then(r => r.json()).catch(() => null)
+    ]);
+
+    const weather = weatherRes.status === "fulfilled" ? weatherRes.value : null;
+    if (!weather) throw new Error("Weather unavailable");
+    const air = airRes.status === "fulfilled" ? airRes.value : null;
+    const flood = floodRes.status === "fulfilled" ? floodRes.value : null;
+    const reverse = reverseRes.status === "fulfilled" ? reverseRes.value : null;
+
+    let name = presetName;
+    if (!name && reverse) {
+      const parts = [reverse.city || reverse.locality, reverse.principalSubdivision, reverse.countryName].filter(Boolean);
+      name = parts.join(", ") || "Selected location";
+    }
+    if (!name) name = "Selected location";
+
+    const current = weather.current || {};
+    const hourlyRaw = weather.hourly || {};
+    let hourly = [];
+    let visibility = null;
+    if (hourlyRaw.time) {
+      const nowHour = (current.time || "").slice(0,13) + ":00";
+      let start = hourlyRaw.time.indexOf(nowHour);
+      if (start < 0) start = 0;
+      visibility = hourlyRaw.visibility ? hourlyRaw.visibility[start] : null;
+      for (let i = start; i < Math.min(start + 24, hourlyRaw.time.length); i++) {
+        hourly.push({
+          time: hourlyRaw.time[i],
+          temperature: hourlyRaw.temperature_2m[i],
+          weather_code: hourlyRaw.weather_code[i],
+          precipitation_probability: hourlyRaw.precipitation_probability ? hourlyRaw.precipitation_probability[i] : null
+        });
+      }
+    }
+
+    const dailyRaw = weather.daily || {};
+    let daily = [];
+    if (dailyRaw.time) {
+      dailyRaw.time.forEach((d, i) => {
+        daily.push({
+          date: d,
+          weather_code: dailyRaw.weather_code[i],
+          max: dailyRaw.temperature_2m_max[i],
+          min: dailyRaw.temperature_2m_min[i],
+          precipitation_probability: dailyRaw.precipitation_probability_max[i]
+        });
+      });
+    }
+
+    let air_quality = null;
+    if (air && air.current) {
+      const aqi = air.current.us_aqi;
+      air_quality = { aqi, pm2_5: air.current.pm2_5, pm10: air.current.pm10, category: aqiCategory(aqi) };
+    }
+
+    let floodInfo = null;
+    if (flood && flood.daily && flood.daily.river_discharge && flood.daily.river_discharge.length) {
+      const discharge = flood.daily.river_discharge[0];
+      const mean = (flood.daily.river_discharge_mean || [])[0];
+      floodInfo = { discharge, mean, ...floodRisk(discharge, mean) };
+    }
+
+    return { name, latitude: lat, longitude: lon, current, visibility, hourly, daily, air_quality, flood: floodInfo };
+  }
+
+  // --- Try backend first (this is where map-click coordinates are sent), fall back to direct ---
+  async function fetchLocationData(lat, lon, presetName){
+    if (backendUp) {
+      try {
+        const url = `${API_BASE}/api/location?lat=${lat}&lon=${lon}` + (presetName ? `&name=${encodeURIComponent(presetName)}` : "");
+        const res = await fetch(url, { signal: AbortSignal.timeout(6000) });
+        if (res.ok) return await res.json();
+      } catch (e) { console.warn("Backend call failed, falling back to direct APIs", e); }
+    }
+    return fetchLocationDataDirect(lat, lon, presetName);
+  }
+
+  function renderAqi(air_quality){
+    const el = document.getElementById("aqiBadge");
+    if (!air_quality || air_quality.aqi == null) { el.innerHTML = ""; return; }
+    const cat = air_quality.category || {label:"--", color:"#94A3B8"};
+    el.innerHTML = `<span class="aqi-badge" style="background:${cat.color}">
+      <span class="aqi-dot"></span> AQI ${air_quality.aqi} · ${cat.label}
+    </span>`;
+  }
+
+  function renderFlood(flood, lat, lon){
+    const el = document.getElementById("floodBanner");
+    if (floodCircle) { map.removeLayer(floodCircle); floodCircle = null; }
+
+    if (!flood || flood.level === "unknown") {
+      el.innerHTML = `<div class="flood-banner"><span class="flood-dot" style="background:#94A3B8"></span>
+        No river discharge data at this point (likely not near a mapped waterway).
+        <span class="note">Estimate, not an official alert</span></div>`;
+      return;
+    }
+    const labelMap = { low: "Low flood risk", moderate: "Elevated flood risk", high: "High flood risk" };
+    const trendText = {
+      rising: `Trending up — discharge expected to rise ~${Math.abs(flood.trend?.change_pct ?? 0)}% over the next 2 days`,
+      falling: `Trending down — discharge expected to ease ~${Math.abs(flood.trend?.change_pct ?? 0)}% over the next 2 days`,
+      steady: "Expected to stay roughly steady over the next 2 days"
+    };
+    const outlook = flood.trend ? trendText[flood.trend.direction] : null;
+
+    el.innerHTML = `<div class="flood-banner"><span class="flood-dot" style="background:${flood.color}"></span>
+      <strong>${labelMap[flood.level]}</strong> — river discharge is ${flood.ratio}× the historical average
+      ${outlook ? `<br><span style="margin-left:19px;">${outlook}</span>` : ""}
+      <span class="note">Based on Open-Meteo river discharge · not an official alert</span></div>`;
+
+    floodCircle = L.circle([lat, lon], {
+      radius: 4000, color: flood.color, fillColor: flood.color, fillOpacity: 0.2, weight: 2
+    }).addTo(map).bindPopup(`${labelMap[flood.level]}<br>Discharge ratio: ${flood.ratio}×${outlook ? `<br>${outlook}` : ""}`);
+  }
+
+  function renderHourly(hourly){
+    const el = document.getElementById("hourlyStrip");
+    el.innerHTML = "";
+    if (!hourly || !hourly.length) { el.innerHTML = `<span style="color:var(--ink-soft);font-size:13px;">Hourly data unavailable.</span>`; return; }
+    hourly.forEach((h, i) => {
+      const [e] = wmo(h.weather_code);
+      const t = new Date(h.time);
+      const label = i === 0 ? "Now" : t.toLocaleTimeString([], {hour:'numeric'});
+      const div = document.createElement("div");
+      div.className = "hitem";
+      div.innerHTML = `<div class="t">${label}</div><div class="e">${e}</div><div class="v">${Math.round(h.temperature)}°</div>`;
+      el.appendChild(div);
+    });
+  }
+
+  function renderDaily(daily){
+    const el = document.getElementById("forecast");
+    el.innerHTML = "";
+    if (!daily) return;
+    daily.forEach((d, i) => {
+      const [e] = wmo(d.weather_code);
+      const dt = new Date(d.date);
+      const label = i === 0 ? "Today" : dt.toLocaleDateString([], {weekday:'short'});
+      const div = document.createElement("div");
+      div.className = "fday";
+      div.innerHTML = `<div class="d">${label}</div><div class="e">${e}</div>
+        <div><span class="hi">${Math.round(d.max)}°</span><span class="lo">${Math.round(d.min)}°</span></div>
+        <div class="p">💧 ${d.precipitation_probability}%</div>`;
+      el.appendChild(div);
+    });
+  }
+
+  function renderAll(data){
+    const [emoji, label] = wmo(data.current.weather_code);
+    document.getElementById("locationName").textContent = data.name;
+    document.getElementById("heroTemp").style.display = "flex";
+    document.getElementById("heroEmoji").textContent = emoji;
+    document.getElementById("temperature").textContent = Math.round(data.current.temperature_2m);
+    document.getElementById("feelsLike").textContent = Math.round(data.current.apparent_temperature);
+    document.getElementById("dayNight").textContent = `${label} · ${data.current.is_day ? "Day" : "Night"}`;
+    document.getElementById("humidity").textContent = `${data.current.relative_humidity_2m}%`;
+    document.getElementById("wind").textContent = `${data.current.wind_speed_10m} km/h`;
+    document.getElementById("pressure").textContent = `${Math.round(data.current.pressure_msl)} hPa`;
+    document.getElementById("rain").textContent = `${data.current.rain} mm`;
+    document.getElementById("visibility").textContent = fmtVis(data.visibility);
+    document.getElementById("updated").textContent = new Date(data.current.time).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+    document.getElementById("status").textContent = `Updated ${new Date(data.current.time).toLocaleString()}`;
+
+    renderAqi(data.air_quality);
+    renderFlood(data.flood, data.latitude, data.longitude);
+    renderHourly(data.hourly);
+    renderDaily(data.daily);
+  }
+
+  async function loadLocation(lat, lon, presetName){
+    document.getElementById("status").textContent = "Loading weather...";
+    try {
+      const data = await fetchLocationData(lat, lon, presetName);
+      renderAll(data);
+    } catch (err) {
+      console.error(err);
+      document.getElementById("status").textContent = "Unable to load data for this location.";
+    }
+  }
+
+  function placeMarker(lat, lon, popupHtml){
+    if (marker) map.removeLayer(marker);
+    marker = L.marker([lat, lon]).addTo(map).bindPopup(popupHtml).openPopup();
+  }
+
+  // Map click -> coordinates -> (FastAPI backend if available, else direct) -> render
+  map.on("click", function(event){
+    const lat = event.latlng.lat;
+    const lon = event.latlng.lng;
+    placeMarker(lat, lon, `<b>Loading name…</b><br>Lat: ${lat.toFixed(4)}, Lon: ${lon.toFixed(4)}`);
+    loadLocation(lat, lon).then(() => {
+      const nameEl = document.getElementById("locationName").textContent;
+      if (marker) marker.setPopupContent(`<b>${nameEl}</b><br>Lat: ${lat.toFixed(4)}, Lon: ${lon.toFixed(4)}`);
+    });
+  });
+
+  // --- Search ---
+  const cityInput = document.getElementById("cityInput");
+  const suggestionsEl = document.getElementById("suggestions");
+  let searchTimer = null;
+
+  async function geocodeSearch(query, count){
+    if (backendUp) {
+      try {
+        const res = await fetch(`${API_BASE}/api/geocode?q=${encodeURIComponent(query)}&count=${count}`, { signal: AbortSignal.timeout(4000) });
+        if (res.ok) return (await res.json()).results;
+      } catch { /* fall through */ }
+    }
+    const res = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(query)}&count=${count}&language=en&format=json`);
+    const data = await res.json();
+    return (data.results || []).map(r => ({ name: r.name, admin1: r.admin1, country: r.country, latitude: r.latitude, longitude: r.longitude }));
+  }
+
+  async function fetchSuggestions(query){
+    if (!query || query.length < 2) { suggestionsEl.classList.remove("open"); suggestionsEl.innerHTML = ""; return; }
+    try {
+      const results = await geocodeSearch(query, 5);
+      suggestionsEl.innerHTML = "";
+      if (!results.length) { suggestionsEl.classList.remove("open"); return; }
+      results.forEach(r => {
+        const label = [r.name, r.admin1, r.country].filter(Boolean).join(", ");
+        const div = document.createElement("div");
+        div.innerHTML = `${r.name}<small>${[r.admin1, r.country].filter(Boolean).join(", ")}</small>`;
+        div.addEventListener("click", () => {
+          selectLocation(r.latitude, r.longitude, label);
+          suggestionsEl.classList.remove("open");
+          cityInput.value = label;
+        });
+        suggestionsEl.appendChild(div);
+      });
+      suggestionsEl.classList.add("open");
+    } catch (err) { console.error(err); }
+  }
+
+  function selectLocation(lat, lon, displayName){
+    map.setView([lat, lon], 10);
+    placeMarker(lat, lon, `<b>${displayName}</b>`);
+    loadLocation(lat, lon, displayName);
+  }
+
+  cityInput.addEventListener("input", () => {
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(() => fetchSuggestions(cityInput.value.trim()), 300);
+  });
+  cityInput.addEventListener("keydown", (e) => { if (e.key === "Enter") { suggestionsEl.classList.remove("open"); searchCity(); } });
+  document.addEventListener("click", (e) => { if (!suggestionsEl.contains(e.target) && e.target !== cityInput) suggestionsEl.classList.remove("open"); });
+
+  async function searchCity(){
+    const city = cityInput.value.trim();
+    if (!city) return;
+    document.getElementById("status").textContent = "Searching...";
+    try {
+      const results = await geocodeSearch(city, 1);
+      if (!results.length) { document.getElementById("status").textContent = "Location not found."; return; }
+      const r = results[0];
+      selectLocation(r.latitude, r.longitude, [r.name, r.admin1, r.country].filter(Boolean).join(", "));
+    } catch (err) {
+      console.error(err);
+      document.getElementById("status").textContent = "Search failed. Please try again.";
+    }
+  }
+
+  document.getElementById("locateBtn").addEventListener("click", () => {
+    if (!navigator.geolocation) { document.getElementById("status").textContent = "Geolocation isn't supported in this browser."; return; }
+    document.getElementById("status").textContent = "Finding your location...";
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const { latitude, longitude } = pos.coords;
+        map.setView([latitude, longitude], 11);
+        placeMarker(latitude, longitude, "<b>Loading name…</b>");
+        loadLocation(latitude, longitude).then(() => {
+          const nameEl = document.getElementById("locationName").textContent;
+          if (marker) marker.setPopupContent(`<b>${nameEl}</b>`);
+        });
+      },
+      (err) => { console.error(err); document.getElementById("status").textContent = "Couldn't get your location. Check browser permissions."; }
+    );
+  });
+
+  // --- Live reported disaster events (GDACS) + real-time earthquakes (USGS) — real events, not model estimates ---
+  const alertColors = { green: "#2A9D6F", orange: "#F4A261", red: "#E76F51" };
+  const disasterLayer = L.layerGroup().addTo(map);
+  const quakeLayer = L.layerGroup().addTo(map);
+
+  function quakeColor(mag){
+    if (mag >= 6) return "#E76F51";
+    if (mag >= 5) return "#F4A261";
+    return "#E9C46A";
+  }
+
+  async function loadDisasterAlerts(){
+    const statusEl = document.getElementById("alertsStatus");
+    try {
+      let alerts = [];
+      if (backendUp) {
+        const res = await fetch(`${API_BASE}/api/disaster-alerts?days=7`, { signal: AbortSignal.timeout(6000) });
+        if (res.ok) alerts = (await res.json()).alerts;
+      } else {
+        const res = await fetch(`https://www.gdacs.org/gdacsapi/api/events/geteventlist/SEARCH?eventlist=FL;TC;WF;VO;DR&fromdate=${isoDaysAgo(7)}&todate=${isoDaysAgo(0)}&alertlevel=green;orange;red`);
+        const data = await res.json();
+        const iconMap = { FL: "🌊", TC: "🌀", WF: "🔥", VO: "🌋", DR: "🏜️" };
+        alerts = (data.features || []).map(f => ({
+          type: f.properties.eventtype,
+          icon: iconMap[f.properties.eventtype] || "⚠️",
+          name: f.properties.eventname || f.properties.name || "Disaster event",
+          country: f.properties.country,
+          alert_level: (f.properties.alertlevel || "green").toLowerCase(),
+          from_date: f.properties.fromdate,
+          to_date: f.properties.todate,
+          url: (f.properties.url && f.properties.url.report) || f.properties.url,
+          latitude: f.geometry.coordinates[1],
+          longitude: f.geometry.coordinates[0],
+        }));
+      }
+
+      disasterLayer.clearLayers();
+      alerts.forEach(a => {
+        const color = alertColors[a.alert_level] || alertColors.green;
+        const m = L.marker([a.latitude, a.longitude], {
+          icon: L.divIcon({ html: `<div style="font-size:20px; filter: drop-shadow(0 0 2px ${color})">${a.icon}</div>`, className: "", iconSize: [24,24], iconAnchor: [12,12] })
+        }).bindPopup(
+          `<b>${a.icon} ${a.name}</b><br>${a.country || ""}<br>${a.from_date ? new Date(a.from_date).toLocaleDateString() : ""} – ${a.to_date ? new Date(a.to_date).toLocaleDateString() : "ongoing"}` +
+          (a.url ? `<br><a href="${a.url}" target="_blank" rel="noopener">Full report ↗</a>` : "")
+        );
+        disasterLayer.addLayer(m);
+      });
+      return alerts.length;
+    } catch (err) {
+      console.warn("Disaster alerts unavailable", err);
+      return null;
+    }
+  }
+
+  async function loadEarthquakes(){
+    try {
+      let quakes = [];
+      if (backendUp) {
+        const res = await fetch(`${API_BASE}/api/earthquakes?min_magnitude=4.5&period=week`, { signal: AbortSignal.timeout(6000) });
+        if (res.ok) quakes = (await res.json()).earthquakes;
+      } else {
+        const res = await fetch(`https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/4.5_week.geojson`);
+        const data = await res.json();
+        quakes = (data.features || []).map(f => ({
+          magnitude: f.properties.mag,
+          place: f.properties.place,
+          time: f.properties.time,
+          depth_km: f.geometry.coordinates[2],
+          url: f.properties.url,
+          latitude: f.geometry.coordinates[1],
+          longitude: f.geometry.coordinates[0],
+        }));
+      }
+
+      quakeLayer.clearLayers();
+      quakes.forEach(q => {
+        const color = quakeColor(q.magnitude);
+        const m = L.circleMarker([q.latitude, q.longitude], {
+          radius: 4 + q.magnitude, color, fillColor: color, fillOpacity: 0.6, weight: 1
+        }).bindPopup(
+          `<b>M${q.magnitude.toFixed(1)}</b> — ${q.place || "Unknown location"}<br>` +
+          `${new Date(q.time).toLocaleString()}<br>Depth: ${q.depth_km != null ? q.depth_km.toFixed(0) + " km" : "--"}` +
+          (q.url ? `<br><a href="${q.url}" target="_blank" rel="noopener">USGS report ↗</a>` : "")
+        );
+        quakeLayer.addLayer(m);
+      });
+      return quakes.length;
+    } catch (err) {
+      console.warn("Earthquake feed unavailable", err);
+      return null;
+    }
+  }
+
+  async function loadAllHazardLayers(){
+    const statusEl = document.getElementById("alertsStatus");
+    statusEl.textContent = "Loading live hazard data…";
+    const [disasterCount, quakeCount] = await Promise.all([loadDisasterAlerts(), loadEarthquakes()]);
+    const parts = [];
+    if (disasterCount !== null) parts.push(`${disasterCount} disaster report${disasterCount === 1 ? "" : "s"}`);
+    if (quakeCount !== null) parts.push(`${quakeCount} quake${quakeCount === 1 ? "" : "s"} (M4.5+, 7d)`);
+    if (!parts.length) {
+      statusEl.textContent = backendUp ? "Live hazard data unavailable right now" : "Live hazard data needs the FastAPI backend running (CORS)";
+    } else {
+      statusEl.textContent = parts.join(" · ");
+    }
+  }
+
+  document.getElementById("toggleDisasters").addEventListener("change", (e) => {
+    if (e.target.checked) map.addLayer(disasterLayer); else map.removeLayer(disasterLayer);
+  });
+  document.getElementById("toggleQuakes").addEventListener("change", (e) => {
+    if (e.target.checked) map.addLayer(quakeLayer); else map.removeLayer(quakeLayer);
+  });
+
+  function isoDaysAgo(n){
+    const d = new Date();
+    d.setDate(d.getDate() - n);
+    return d.toISOString().slice(0,10);
+  }
+
+  (function init(){
+    loadLocation(20.5937, 78.9629, "India");   // starts immediately, doesn't wait on backend check
+    checkBackend().then(loadAllHazardLayers);  // backend check + hazard layers load in parallel with the above
+  })();
+</script>
+</body>
+</html>
