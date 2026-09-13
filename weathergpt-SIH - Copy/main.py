@@ -75,8 +75,39 @@ def health():
 
 @app.get("/weather/{city}")
 def get_weather(city: str):
-    result = weather_tool.invoke(city)
-    return result
+    try:
+        location = weather_tool.invoke(city)
+
+        if isinstance(location, str):
+            return {"error": location}
+
+        result = forcast_weather.invoke({
+            "days": 1,
+            "latitude": location["latitude"],
+            "longitude": location["longitude"]
+        })
+
+        current = result.get("current", {})
+
+        return {
+            "city": location["city"],
+            "latitude": location["latitude"],
+            "longitude": location["longitude"],
+            "temperature": current.get("temp_c"),
+            "humidity": current.get("humidity"),
+            "wind_speed": current.get("wind_kph"),
+            "pressure": current.get("pressure_mb"),
+            "cloud_cover": current.get("cloud"),
+            "condition": current.get("condition", {}).get("text"),
+            "icon": current.get("condition", {}).get("icon")
+        }
+
+    except Exception as e:
+        print("WEATHER ERROR:", repr(e))
+        return {
+            "error": "Weather data unavailable",
+            "details": str(e)
+        }
 
 @app.get("/forecast/{city}")
 def get_forecast(city: str, days: int = 7):
