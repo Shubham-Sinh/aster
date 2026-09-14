@@ -1,94 +1,121 @@
-"""import requests
-import json
-from . parc import weather_tool
-from langchain_core.tools import tool
-# getting the last 7 days weather output
-@tool
-def forcast_weather(days:int,latitude,longitude):
-    Get weather forecast information.
-    url = "https://api.open-meteo.com/v1/forecast"
-    param={
-        "forecast_days":days,
-        "latitude": latitude,
-        "longitude": longitude,
-        "timezone":"auto",
-        "hourly":"rain , temperature_2m,relative_humidity_2m,pressure_msl,wind_speed_10m,cloud_cover",
-        "daily": "temperature_2m_max,temperature_2m_min,precipitation_probability_max",        
-    }
-    request=requests.get(url,params=param)
-    print("Status:", request.status_code)
-    print("Response:", request.text)
-    responces=request.json()
-    return {
-        "hourly":responces["hourly"],
-        "daily":responces["daily"]
-    }
-
-input_number=input("Enter the City Name:")
-daYS=int(input("how much days u want forcast:"))
-output=weather_tool(input_number)
-langitude=output["latitude"]
-longitude=output["longitude"]
-
-responces=forcast_weather(daYS,langitude,longitude)
-print(responces) 
-
-import requests
-import json
-from langchain_core.tools import tool
-
-# getting the weather output
-@tool
-def forcast_weather(days: int, latitude: float, longitude: float):
-    Get weather forecast information for given days, latitude, and longitude.
-    url = "https://api.open-meteo.com/v1/forecast"
-    
-    # Notice: NO SPACES between comma-separated values in hourly
-    param = {
-        "forecast_days": int(days),
-        "latitude": float(latitude),
-        "longitude": float(longitude),
-        "timezone": "auto",
-        "hourly": "rain,temperature_2m,relative_humidity_2m,pressure_msl,wind_speed_10m,cloud_cover",
-        "daily": "temperature_2m_max,temperature_2m_min,precipitation_probability_max"        
-    }
-    
-    request = requests.get(url, params=param)
-    responces = request.json()
-    
-    # Agar API ne error diya toh crash hone se bachaye
-    if "hourly" not in responces:
-        raise ValueError(f"Open-Meteo API Error: {responces.get('reason', responces)}")
-    
-    return {
-        "hourly": responces["hourly"],
-        "daily": responces.get("daily", {})
-    }
-"""
+import os
 import requests
 from langchain_core.tools import tool
 
+
 @tool
 def forcast_weather(days: int, latitude: float, longitude: float):
-    """Get weather forecast information for given days, latitude, and longitude."""
-    url = "https://api.open-meteo.com/v1/forecast"
-    
-    # days agar 0 ya negative aaye toh kam se kam 1 rakho
-    forecast_days = max(int(days), 1)
-    
-    param = {
-        "forecast_days": forecast_days,
-        "latitude": float(latitude),
-        "longitude": float(longitude),
-        "timezone": "auto",
-        "hourly": "rain,temperature_2m,relative_humidity_2m,pressure_msl,wind_speed_10m,cloud_cover",
-        "daily": "temperature_2m_max,temperature_2m_min,precipitation_probability_max"
+    """Get weather forecast using WeatherAPI."""
+
+    api_key = os.getenv("WEATHER_API_KEY")
+
+    if not api_key:
+        raise ValueError("WEATHER_API_KEY is not configured.")
+
+    forecast_days = min(max(int(days), 1), 3)
+
+    url = "https://api.weatherapi.com/v1/forecast.json"
+
+    params = {
+        "key": api_key,
+        "q": f"{latitude},{longitude}",
+        "days": forecast_days,
+        "aqi": "no",
+        "alerts": "yes"
     }
-    
-    response = requests.get(url, params=param)
-    res = response.json()
-    
+
+    response = requests.get(
+        url,
+        params=params,
+        timeout=20
+    )
+
+    response.raise_for_status()
+
+    data = response.json()
+
+    # -----------------------------
+    # WeatherAPI -> Existing Format
+    # -----------------------------
+
+    weather_forecast = data.get("forecast", {})
+
+    hourly_data = []
+    daily_data = []
+
+    for forecast_day in weather_forecast.get("forecastday", []):
+
+        # Daily data
+        day = forecast_day.get("day", {})
+
+        daily_data.append({
+            "time": forecast_day.get("date"),
+            "temperature_2m_max": day.get("maxtemp_c"),
+            "temperature_2m_min": day.get("mintemp_c"),
+            "precipitation_probability_max": day.get(
+                "daily_chance_of_rain"
+            ),
+            "precipitation_sum": day.get("totalprecip_mm")
+        })
+
+        # Hourly data
+        for hour in forecast_day.get("hour", []):
+
+            hourly_data.append({
+                "time": hour.get("time"),
+                "temperature_2m": hour.get("temp_c"),
+                "relative_humidity_2m": hour.get("humidity"),
+                "wind_speed_10m": hour.get("wind_kph"),
+                "cloud_cover": hour.get("cloud"),
+                "rain": hour.get("precip_mm"),
+                "precipitation_probability": hour.get(
+                    "chance_of_rain"
+                )
+            })
+
     return {
-        "hourly": res.get("hourly", {}),
-        "daily": res.get("daily", {})
+        "current": data.get("current", {}),
+
+        # Compatible with existing backend
+        "hourly": {
+            "time": [x["time"] for x in hourly_data],
+            "temperature_2m": [
+                x["temperature_2m"] for x in hourly_data
+            ],
+            "relative_humidity_2m": [
+                x["relative_humidity_2m"] for x in hourly_data
+            ],
+            "wind_speed_10m": [
+                x["wind_speed_10m"] for x in hourly_data
+            ],
+            "cloud_cover": [
+                x["cloud_cover"] for x in hourly_data
+            ],
+            "rain": [
+                x["rain"] for x in hourly_data
+            ],
+            "precipitation_probability": [
+                x["precipitation_probability"]
+                for x in hourly_data
+            ]
+        },
+
+        "daily": {
+            "time": [x["time"] for x in daily_data],
+            "temperature_2m_max": [
+                x["temperature_2m_max"] for x in daily_data
+            ],
+            "temperature_2m_min": [
+                x["temperature_2m_min"] for x in daily_data
+            ],
+            "precipitation_probability_max": [
+                x["precipitation_probability_max"]
+                for x in daily_data
+            ],
+            "precipitation_sum": [
+                x["precipitation_sum"] for x in daily_data
+            ]
+        },
+
+        "alerts": data.get("alerts", {})
     }

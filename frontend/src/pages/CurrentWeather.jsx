@@ -18,7 +18,7 @@ function CurrentWeather() {
 
     try {
       const response = await fetch(
-        `http://127.0.0.1:8000/weather/${encodeURIComponent(city)}`
+        `https://aster-4.onrender.com/weather/${encodeURIComponent(city)}`
       );
 
       if (!response.ok) {

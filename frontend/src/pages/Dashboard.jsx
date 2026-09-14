@@ -1,7 +1,9 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 
-const API_BASE_URL = "http://127.0.0.1:8000";
+// const API_BASE_URL = "https://aster-4.onrender.com";
+
+const API_BASE_URL = "https://aster-4.onrender.com";
 
 function Dashboard() {
   const [city, setCity] = useState("Delhi");

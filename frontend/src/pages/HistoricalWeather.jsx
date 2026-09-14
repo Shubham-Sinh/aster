@@ -19,7 +19,7 @@ function HistoricalWeather() {
 
     try {
       const response = await fetch(
-        `http://127.0.0.1:8000/historical-weather/${encodeURIComponent(
+        `https://aster-4.onrender.com/historical-weather/${encodeURIComponent(
           city
         )}?days=${days}`
       );

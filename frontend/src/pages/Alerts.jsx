@@ -19,7 +19,7 @@ function Alerts() {
 
     try {
       const response = await fetch(
-        `http://127.0.0.1:8000/forecast/${encodeURIComponent(city)}?days=3`
+        `https://aster-4.onrender.com/forecast/${encodeURIComponent(city)}?days=3`
       );
 
       if (!response.ok) {

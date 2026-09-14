@@ -18,7 +18,7 @@ function RainPrediction() {
 
     try {
       const response = await fetch(
-        `http://127.0.0.1:8000/rain-prediction/${encodeURIComponent(city)}?days=3`
+        `https://aster-4.onrender.com/rain-prediction/${encodeURIComponent(city)}?days=3`
       );
 
       if (!response.ok) {
